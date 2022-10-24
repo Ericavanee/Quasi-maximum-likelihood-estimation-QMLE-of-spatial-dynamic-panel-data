@@ -184,7 +184,7 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
     Weight_ls : list; np.ndarray; float64
         List of length T+1 of np.ndarray for weight matrix per time point.
     initial_guess : list; float64
-        List of length 5 containing initial guess of each of the parameters.
+        List of length 5 containing initial guess of each of the parameters; if None, function will set initial_guess to default.
     constrain: Bool
         Boolean choosing whether or not to impose constraints on the QMLE problem.
               
@@ -193,11 +193,18 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
     1D array; float64
         A list of found estimators in the sequence of sigma, lambda, gamma, rho, and beta.    
     """ 
-    
+    n_0 = x_dataset[0].shape[0]
+    T_0 = len(x_dataset)
+    k_0 = x_dataset[0].shape[1]
+    if initial_guess == None:
+        # set up default initial guess
+        initial_guess = [1, 0.5, 1, 1, *np.ones(k_0)]
     global n
     n = n_0
     global T
     T = T_0
+    global k 
+    k = k_0
     global x
     x = x_dataset
     global y
@@ -211,10 +218,16 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
     # implement the constrained version
     if constrain == True:
         const = scipy_constraint(T)
-        res = minimize(QMLE_obj_scipy, initial_guess, method='trust-constr', constraints = const)
+        res = minimize(QMLE_scipy_obj, initial_guess, method='trust-constr', constraints = const)
         # return maximizing parameters 
-        return res.x
+        my_params = res.x
+        sigma, lam, gamma, rho = my_params[:4]
+        beta = my_params[4:]
+        return [sigma, lam, gamma, rho,beta]
     else:
-        res = minimize(QMLE_obj_scipy, initial_guess, method='nelder-mead', options={'xatol': 0.000001, 'disp': False})
-        return res.x
+        res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
+        my_params = res.x
+        sigma, lam, gamma, rho = my_params[:4]
+        beta = my_params[4:]
+        return [sigma, lam, gamma, rho,beta]
     
