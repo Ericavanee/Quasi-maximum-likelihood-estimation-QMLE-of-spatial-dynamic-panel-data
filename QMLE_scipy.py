@@ -4,12 +4,12 @@ from scipy.optimize import NonlinearConstraint
 
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
-# Version: Oct 18, 2022
+# Version: Oct 23, 2022
 
-# DESCRIPTION: This package computes QMLE estimators with 1D feature and exogenous, potentially time-varying weight matrices using scipy.optimize. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
+# DESCRIPTION: This package computes QMLE estimators with k-D features and exogenous, potentially time-varying weight matrices using scipy.optimize. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
 
 
-def QMLE_obj_scipy(params):
+def QMLE_scipy_obj(params):
     r"""QMLE objective function formulated for scipy.optimize
      
     The main idea of this function is to generate the objective QMLE function formulated in equation (7) of the paper by Lee & Yu. 
@@ -18,16 +18,16 @@ def QMLE_obj_scipy(params):
     Parameters
     ----------
     params: 1D array
-        1D numpy array of five real numbers: sigma, lambda, gamma, rho, and beta.
+        1D numpy array of sigma, lambda, gamma, rho, and beta, where beta is an 1D array of length k.
         
     Returns
     -------
     float64
         negative of QMLE real-valued output
      """ 
-    sigma, lam, gamma, rho, beta = params
-    obj= -1/2*((n-1)*T)*np.log(2*np.pi)-1/2*((n-1)*T)*np.log(sigma**2)-T*np.log(1-lam)+np.sum(get_S(sigma,lam,gamma, rho, beta))-1/(2*sigma**2)*np.sum(get_V(sigma,lam,gamma, rho, beta))
-    #maximize is to minimize the negative
+    sigma, lam, gamma, rho = params[:4]
+    beta = params[4:]
+    obj = -1/2*((n-1)*T)*np.log(2*np.pi)-1/2*((n-1)*T)*np.log(sigma**2)-T*np.log(1-lam)+np.sum(get_S(sigma,lam,gamma, rho, beta))-1/(2*sigma**2)*np.sum(get_V(sigma,lam,gamma, rho, beta))
     return (-1)*obj
 
 
@@ -46,7 +46,7 @@ def get_S(sigma,lam,gamma, rho, beta):
         regression function parameter in equation (1)
     rho : float64
         regression function parameter in equation (1)
-    beta : float64
+    beta : 1Darray; float64
         regression function parameter in equation (1)
         
     Returns
@@ -80,7 +80,7 @@ def get_V(sigma,lam,gamma, rho, beta):
         regression function parameter in equation (1)
     rho : float64
         regression function parameter in equation (1)
-    beta : float64
+    beta : 1Darray; float64
         regression function parameter in equation (1)
         
     Returns
@@ -97,14 +97,17 @@ def get_V(sigma,lam,gamma, rho, beta):
             W2 = W_ls[j+1]
             S_nt2 = np.identity(n) - lam*W2
             SY_ls.append(np.matmul(S_nt2,np.array(y[j+1]).reshape(n,1)))
+        # already in shape (n,1)
         SY_sum = sum(SY_ls)
         # first component
-        SY_tilde = (np.matmul(S_nt,np.array(y[j+1]).reshape(n,1))-(1/T)*SY_sum).reshape(n,1)
+        SY_tilde = np.matmul(S_nt,np.array(y[i+1]).reshape(n,1))-(1/T)*SY_sum        
+
         # second component
         Y_ls = []
-        for k in range(T):
-            Y_ls.append(y[k])
+        for q in range(T):
+            Y_ls.append(y[q])
         Y_tilde_lag = np.array(y[i]-(1/T)*sum(Y_ls)).reshape(n,1)
+          
         WY_ls = []
         for l in range(T):
             W3 = W_ls[l]
@@ -112,22 +115,26 @@ def get_V(sigma,lam,gamma, rho, beta):
         WY_sum = sum(WY_ls)
         W_lag = W_ls[i]
         WY_tilde_lag = np.matmul(W_lag, np.array(y[i]).reshape(n,1))-(1/T)*(WY_sum)
+             
         X_ls = []
         for m in range(T):
-            X_ls.append(x[m])
+            # convert x to array
+            X_ls.append(np.array(x[m]))
         X_sum = sum(X_ls)
-        X_tilde = np.array(x[i]-(1/T)*X_sum).reshape(n,1)
+        X_tilde = np.array(np.array(x[i])-(1/T)*X_sum).reshape(n,k)
+              
         Z_tilde = [Y_tilde_lag,WY_tilde_lag,X_tilde]
+        
         # third component
         l_n = np.ones(n).reshape(n,1)
-        alpha_ln = alpha[i]*l_n
         # forth component
         J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
         # fifth component
-        V_tilde = np.array(SY_tilde-(gamma*Z_tilde[0]+rho*Z_tilde[1]+beta*Z_tilde[2])).reshape(n,1)
+        Z_delta = (gamma*Z_tilde[0]).reshape(n,1)+(rho*Z_tilde[1]).reshape(n,1)+np.matmul(Z_tilde[2],np.array(beta).reshape(k,1)).reshape(n,1)
+        V_tilde = np.array(SY_tilde-Z_delta).reshape(n,1)
         # putting everything together
         VJ = np.matmul(V_tilde.transpose(),J_n)
-        VJV = np.matmul(VJ,V_tilde)
+        VJV = np.matmul(VJ, V_tilde)
         V_ls.append(VJV)     
     return V_ls
 
@@ -159,21 +166,19 @@ def scipy_constraint(T):
     return my_con
 
 
-def QMLE_scipy_estimate(n_0,T_0, alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_guess, constrain = True):
+def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_guess = None, constrain = True):
     r"""Runs scipy.optimize for QMLE
      
     The main idea of this function is to generate QMLE estimators by solving the optimizing function in scipy. 
     
     Parameters
     ----------
-    n_0: int
-        Number of samples per time point.
-    T_0 : int
-        Number of time points.
     alpha_0 : 1D array; float64
         1D array of length T for vector of time effect.
-    x_dataset : list; 1D array; float64
-        List of length T of 1D array of length n for feature vector.
+    c_0: 1Darray; float64
+        1D array of length n.
+    x_dataset : list; ndarray; float64
+        List of length T of ndarray of shape (n,k) for feature vector.
     y_attribute : list; 1D array; float64
         List of length T+1 of 1D array of length n for spatial unit feature vector.
     Weight_ls : list; np.ndarray; float64
