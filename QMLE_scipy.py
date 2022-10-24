@@ -32,41 +32,7 @@ def QMLE_scipy_obj(params):
 
 
 def get_S(sigma,lam,gamma, rho, beta):
-     r"""Assists QMLE objective function
-     
-    The main idea of this function is to provide import parts to the objective QMLE function formulated in equation (7) of the paper by Lee & Yu. This function resolves to a real value given parameters. 
-    
-    Parameters
-    ----------
-    sigma : float64
-        standard deviation of column vector V_nt in equation (1).
-    lam : float64
-        regression function parameter in equation (1).
-    gamma : float64
-        regression function parameter in equation (1)
-    rho : float64
-        regression function parameter in equation (1)
-    beta : 1Darray; float64
-        regression function parameter in equation (1)
-        
-    Returns
-    -------
-    list; float64
-        A list of real numbers
-    """    
-    
-    S_ls = []
-    for i in range(T):
-        W = W_ls[i+1]
-        S_nt = np.identity(n) - lam*W
-        # further impose that the determinant is positive to allow logarithm to work
-        det_S = np.linalg.det(S_nt)
-        S_ls.append(np.log(abs(det_S)))
-    return S_ls
-
-
-def get_V(sigma,lam,gamma, rho, beta):
-     r"""Assists QMLE objective function
+    r"""Assists QMLE objective function
      
     The main idea of this function is to provide import parts to the objective QMLE function formulated in equation (7) of the paper by Lee & Yu. This function resolves to a real value given parameters. 
     
@@ -88,6 +54,39 @@ def get_V(sigma,lam,gamma, rho, beta):
     list; float64
         A list of real numbers
     """ 
+    S_ls = []
+    for i in range(T):
+        W = W_ls[i+1]
+        S_nt = np.identity(n) - lam*W
+        # further impose that the determinant is positive to allow logarithm to work
+        det_S = np.linalg.det(S_nt)
+        S_ls.append(np.log(abs(det_S)))
+    return S_ls
+
+
+def get_V(sigma,lam,gamma, rho, beta): 
+    r"""Assists QMLE objective function
+     
+    The main idea of this function is to provide import parts to the objective QMLE function formulated in equation (7) of the paper by Lee & Yu. This function resolves to a real value given parameters. 
+    
+    Parameters
+    ----------
+    sigma : float64
+        standard deviation of column vector V_nt in equation (1).
+    lam : float64
+        regression function parameter in equation (1).
+    gamma : float64
+        regression function parameter in equation (1)
+    rho : float64
+        regression function parameter in equation (1)
+    beta : 1Darray; float64
+        regression function parameter in equation (1)
+        
+    Returns
+    -------
+    list; float64
+        A list of real numbers
+    """
     V_ls = []
     for i in range(T):
         W = W_ls[i+1]
@@ -140,7 +139,7 @@ def get_V(sigma,lam,gamma, rho, beta):
 
 
 def scipy_constraint(T):
-     r"""Generate constraints for QMLE
+    r"""Generate constraints for QMLE
      
     The main idea of this function is to generate minor constraints for QMLE. It is important to note that in general QMLE does not require constraints. This function only offers an alternative to run 'trust-constr' method from scipy to ensure that minor constraints are satisfied so the optimizer does not encounter invalid values in its iterations. 
     
