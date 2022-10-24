@@ -1,0 +1,327 @@
+import numpy as np
+
+# Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
+# License: MIT License
+# Version: Oct 23, 2022
+
+# DESCRIPTION: This package computes QMLE asymptotic variance. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
+
+def get_asymp_var(estimated_params, x,y, c0, n, T, k, W_ls):
+    sigma, lam, gamma, rho = estimated_params[:4]
+    beta = estimated_params[4:]
+    info_mat = get_info_mat(x,y, c0, W_ls,lam,sigma,k,n,T)
+    var_score = get_var_score()
+    inv_info_mat = np.linalg.inv(info_mat)
+    info_score = np.matmul(inv_info_mat,var_score)
+    asymp_var = 1/((n-1)*T)*np.matmul(info_score,inv_info_mat)
+    return asymp_var
+
+def get_var_score(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    info_mat = get_info_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega = get_omega(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    return np.array(info_mat+omega).reshape(k+4,k+4)
+
+def get_omega(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    omega_first_part = get_omega_first_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega_second_part = get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega = get_omega_first_part+omega_second_part
+    return np.array(omega).reshape(k+4,k+4)
+
+def get_omega_first_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    first_vec = get_first_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T) # 1*(k+2)
+    second_vec = get_second_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T) # 1*(k+2)
+    first_k_plus_2_row = []
+    for i in range(k+2):
+        first_k_plus_2_row = np.zeros(k+2).tolist()
+        first_k_plus_2_row.append(first_vec[i])
+        first_k_plus_2_row.append(second_vec[i])
+        
+    second_row = second_vec.tolist().extend([0,0])
+    third_row = third_vec.tolist().extend([0,0])
+    
+    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    
+    return np.array(reshape_ls).reshape(k+4,k+4)
+
+
+def get_first_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    sum_ls = []
+    for t in range(T):
+        Gnt = get_Gnt(W_ls, n, lam, t)
+        l_n = np.ones(n).reshape(n,1)
+        J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
+        JG = np.matmul(J_n,Gnt).reshape(n,n)
+        JG_diag = JG.diagonal()
+        Z_tilde = get_Z_tilde(n,k,x,y,W_ls,T,t)
+        JZ_tilde = np.matmul(J_n,Z_tilde).reshape(n,k+2)
+        row_vec = [] # 1*(k+2)
+        for i in range(n):
+            row_vec.append(JG_diag[i]*JZ_tilde[i])
+        sum_ls.append(sum(row_vec))
+    first_omega_vec = mu3/(sigma**4*(n-1)*T)*sum(sum_ls)
+    return np.array(first_omega_vec).reshape(1,k+2)
+
+
+def get_second_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    sum_ls = []
+    for t in range(T):
+        Z_tilde = get_Z_tilde(n,k,x,y,W_ls,T,t)
+        l_n = np.ones(n).reshape(n,1)
+        J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
+        JZ_tilde = np.matmul(J_n,Z_tilde).reshape(n,k+2)
+        row_vec = [] # 1*(k+2)
+        for i in range(n):
+            row_vec.append(JZ_tilde[i])
+        sum_ls.append(sum(row_vec))
+    second_omega_vec = mu3/(2*sigma**6*n*T)*sum(sum_ls)
+    return np.array(second_omega_vec).reshape(1,k+2)
+
+
+def get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    result = get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    first_num = result[0]
+    second_num = result[1]
+    first_k_plus_2_row = []
+    for i in range(k+2):
+        first_k_plus_2_row.append(np.zeros(k+4))
+    second_row = np.zeros(k+2).tolist().extend([first_num,second_num])
+    third_row = np.zeros(k+2).tolist().extend([second_num,(mu4-3*sigma**4)/(4*sigma**8)])
+    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    
+    return np.array(reshape_ls).reshape(k+4,k+4)
+
+
+def get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    first_sum_ls = []
+    second_sum_ls = []
+    third_sum_ls = []
+    forth_sum_ls = []
+    for t in range(T):
+        delta = np.array([gamma,rho,*beta]).reshape(k+2,1)
+        Gnt = get_Gnt(W_ls, n, lam, t)
+        G_ls = []
+        for m in len(T):
+            G_ls.append(get_Gnt(W_ls, n, lam, m))
+        G_tilde = Gnt-(1/T)*sum(G_ls)
+        l_n = np.ones(n).reshape(n,1)
+        J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
+        Znt = get_Znt(n,k,x,y,W_ls,t)
+        GZnt = np.matmul(Gnt,Znt).reshape(n,k+2)
+        GZ_ls = []
+        for r in range(T):
+            Gnt2 = get_Gnt(W_ls, n, lam, r)
+            Znt2 = get_Znt(n,k,x,y,W_ls,r)
+            GZ_ls.append(np.matmul(Gnt2,Znt2))
+        GZ_tilde = np.matmul(Gnt,Znt)-(1/T)*sum(GZ_ls)
+        # arange components
+        JG = np.matmul(J_n,Gnt).reshape(n,n)
+        JG_sqr = np.matmul(JG,JG.transpose()).reshape(n,n)
+        JG_diag = JG.diagonal()
+        JG_sqr_diag = JG_sqr.diagonal()
+        
+        JGZ_tilde = np.matmul(J_n,GZ_tilde).reshape(n,k+2)
+        JGZ_tilde_delta = np.matmul(JGZ_tilde,delta).reshape(n,1)
+        
+        JG_tilde = np.matmul(J_n,G_tilde).reshape(n,n)
+        JG_tilde_c = np.matmul(JG_tilde,c0).reshape(n,1)
+        
+        JGZDelta_c = JGZ_tilde_delta+JG_tilde_c
+        
+        first_row_ls = []
+        second_row_ls = []
+        third_row_ls = []
+        forth_row_ls = []
+        
+        for i in range(n):
+            first_row_ls.append(*(JG_diag[i]*JGZDelta_c[i]))
+            second_row_ls.append(JG_sqr_diag[i])
+            third_row_ls.append(*(JGZDelta_c[i]))
+            forth_row_ls.append(JG.trace())
+        
+        first_sum_ls.append(sum(first_row_ls))
+        second_sum_ls.append(sum(second_row_ls))
+    
+    # first term
+    first_term = (2*mu3)/(sigma**4*(n-1)*T)*sum(first_sum_ls)
+    # second term
+    second_term = (mu4-3*sigma**4)/(sigma**4*(n-1)*T)*sum(second_sum_ls)
+    # third term
+    third_term = (mu3)/(2*sigma**6*n*T)*sum(third_sum_ls)
+    # forth term
+    forth_term = (mu4-3*sigma**4)/(2*sigma**6*(n-1)*T)
+    
+    #altogether
+    return [first_term+second_term,third_term+forth_term]
+
+
+def get_info_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    # this is a (k+4)*(k+4) matrix
+    first_info_mat = get_first_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    second_info_mat = get_second_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    info_mat = 1/(sigma**2)*first_info_mat+second_info_mat
+    info_mat.reshape(k+4,k+4)
+    return info_mat
+
+
+def get_first_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    # (k+3)*(k+3)
+    HnT = get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    reshape_ls = []
+    for i in range(k+3):
+        row_vec = HnT[i].tolist()
+        row_vec.append(0) # assume that * = 0
+        reshape_ls.append(row_vec)
+    reshape_ls.append(np.ones(k+4))
+    return np.array(reshape_ls).reshape(k+4,k+4) 
+
+
+
+def get_second_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    # (k+3)*(k+3)
+    GJG_JG_tr_ls = []
+    JG_tr_ls = []
+    for i in range(T):
+        Gnt = get_Gnt(W_ls, n, lam, i)
+        l_n = np.ones(n).reshape(n,1)
+        J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
+        GJ = np.matmul(Gnt.transpose(),J_n).reshape(n,n)
+        GJG = np.matmul(GJ,Gnt).reshape(n,n)
+        JG = np.matmul(J_n,Gnt).reshape(n,n)
+        GJG_tr = np.matrix.trace(GJG)
+        JG_tr = np.matrix.trace(JG)
+        JG_sqr_tr = np.matrix.trace(np.matmul(JG,JG.transpose()))
+        GJG_JG_tr = GJG_tr+JG_tr
+        GJG_JG_tr_ls.append(GJG_JG_tr)
+        JG_tr_ls.append(JG_tr)
+    
+    # constant
+    first_trace = 1/((n-1)*T)*sum(GJG_JG_tr_ls)
+    # constant
+    second_trace = 1/(sigma**2*(n-1)*T)*sum(JG_tr_ls)
+    
+    # putting togther the matrix
+    first_k_plus_2_row = []
+    for j in range(k+2):
+        first_k_plus_2_row.append(np.zeros(k+4))
+    second_row = np.zeros(k+2).tolist().append(first_trace)
+    second_row.append(second_trace)
+    third_row = np.zeros(k+2).tolist().append(second_trace)
+    third_row.append(1/(2*sigma**4))
+    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    
+    return np.array(reshape_ls).reshape(k+4,k+4)        
+
+
+def get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    Hnt_vec_ls = []
+    for i in range(T):
+        #delta is (k+2)*1
+        delta = [gamma,rho,*beta]
+        #Gnt is n*n
+        Gnt = get_Gnt(W_ls, n, lam, i)
+        #G_tilde is n*n
+        G_ls = []
+        for j in len(T):
+            G_ls.append(get_Gnt(W_ls, n, lam, j))
+        G_tilde = Gnt-(1/T)*sum(G_ls)
+    
+        #Znt and Z_tilde is n*(k+2)
+        Znt = get_Znt(n,k,x,y,W_ls,i)
+        Z_tilde = get_Z_tilde(n,k,x,y,W_ls,T,i)
+
+        #GZnt and GZ_tilde is n*(k+2)
+        GZnt = np.matmul(Gnt,Znt).reshape(n,k+2)
+        GZ_ls = []
+        for r in range(T):
+            Gnt2 = get_Gnt(W_ls, n, lam, r)
+            Znt2 = get_Znt(n,k,x,y,W_ls,r)
+            GZ_ls.append(np.matmul(Gnt2,Znt2))
+        GZ_tilde = np.matmul(Gnt,Znt)-(1/T)*sum(GZ_ls)
+    
+        #GZ_delta is n*1
+        GZ_delta = np.matmul(GZ_tilde,delta).reshape(n,1)
+        GZ_delta_c = GZ_delta - np.matmul(G_tilde, np.array(c0).reshape(n,1))
+    
+        # reshape H_mat
+        ravel_Z_tilde = []
+        for p in range(n):
+            ravel_Z_tilde.append(Z_tilde[p])
+    
+        reshape_list = [ravel_Z_tilde,GZ_delta_c.ravel()]
+        final_reshape_list = []
+        for q in range(n):
+            row_vec = reshape_list[0][q].append(reshape_list[1][q])
+            final_reshape_list.append(row_vec)
+        
+        H_mat = np.array(final_reshape_list).reshape(n,k+3)
+        
+        #J_n is n*n
+        l_n = np.ones(n).reshape(n,1)
+        J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
+        
+        #Hnt_vec is (k+3)*(k+3)
+        Hnt_Jn = np.matmul(H_mat.transpose(),J_n)
+        Hnt_vec = np.matmul(Hnt_Jn,H_mat)
+        Hnt_vec_ls.append(Hnt_vec)
+        
+    H = (1/((n-1)*T))*sum(Hnt_vec_ls)
+    return H    
+
+
+def get_Znt(n,k,x,y,W_ls,t):
+    Y_lag = y[t]
+    WY_lag = np.matmul(W_ls[t],Y_lag)
+    Xnt = x[t]
+    Znt = regroup_matrix(Y_lag,WY_lag,Xnt,n,k)
+    return Znt
+
+
+
+def get_Gnt(W_ls, n, lam, t):
+    W = W_ls[t]
+    S_nt = np.identity(n) - lam*W
+    Gnt = np.matmul(W,linalg.inv(S_nt)).reshape(n,n)
+    return Gnt
+
+
+def get_Z_tilde(n,k,x,y,W_ls,T,t):
+    Y_ls = []
+    for q in range(T):
+        Y_ls.append(y[q])
+    Y_tilde_lag = np.array(y[t]-(1/T)*sum(Y_ls)) # flattened array
+        
+    WY_ls = []
+    for l in range(T):
+        W3 = W_ls[l]
+        WY_ls.append(np.matmul(W3,np.array(y[l]).reshape(n,1)))
+    WY_sum = sum(WY_ls)
+    W_lag = W_ls[t]
+    WY_tilde_lag = np.matmul(W_lag, np.array(y[t]).reshape(n,1))-(1/T)*(WY_sum)
+    # flatten shape
+    WY_tilde_lag.ravel()
+        
+    X_ls = []
+    for m in range(T):
+        X_ls.append(np.array(x[m]))
+    X_sum = sum(X_ls)
+    X_tilde = np.array(np.array(x[t])-(1/T)*X_sum).reshape(n,k) 
+    
+    ravel_X = []
+    for p in range(n):
+        ravel_X.append(X_tilde[p])
+    
+    #Z_tilde is n*(k+2)
+    Z_tilde = regroup_matrix(Y_tilde_lag,WY_tilde_lag,ravel_X, n, k)
+            
+    return Z_tilde  
+
+
+def regroup_matrix(y_vec, wy_vec, x_vec, n, k):
+    # regroup n*1, n*1, n*k into a matrix of n*(k+2)
+    my_list = [y_vec,wy_vec,x_vec]
+    reshape_list = []
+    for i in range(n):
+        row_vec = [my_list[0][i],my_list[1][i]]
+        row_vec.extend(my_list[2][i])
+        reshape_list.append(row_vec)
+    return np.array(reshape_list).reshape(n,k+2)    
