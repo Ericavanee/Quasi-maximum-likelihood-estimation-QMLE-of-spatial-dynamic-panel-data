@@ -180,8 +180,8 @@ def get_first_infoMat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
         row_vec = HnT[i].tolist()
         row_vec.append(0) # assume that * = 0
         reshape_ls.append(row_vec)
-    reshape_ls.append(np.ones(k+4))
-    return np.array(reshape_ls).reshape(k+4,k+4) 
+    reshape_ls.append(np.zeros(k+4))
+    return np.array(reshape_ls).reshape(k+4,k+4)  
 
 
 # test passed
