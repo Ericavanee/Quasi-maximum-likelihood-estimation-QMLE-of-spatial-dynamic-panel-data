@@ -402,6 +402,12 @@ def get_alpha_t(sigma,lam,gamma, rho, beta, t):
     alpha_t = (1/n)*np.matmul(l_n.transpose(),rnt-c0)[0][0]
     return alpha_t
 
+def get_alpha(sigma,lam,gamma, rho, beta, T):
+    alpha = []
+    for i in range(T):
+        alpha_t = get_alpha_t(sigma,lam,gamma, rho, beta, i)
+        alpha.append(alpha_t)
+    return alpha
 
 # test passed
 def get_Vnt(n,k,T,x,y,W_ls,params,t):
@@ -425,6 +431,17 @@ def get_Vnt(n,k,T,x,y,W_ls,params,t):
     
     return Vnt
 
+# test passed
+def get_residual(n,k,T,x,y,W_ls,params):
+    Vnt_ls = []
+    for i in range(T):
+        Vnt = get_Vnt(n,k,T,x,y,W_ls,params,i)
+        Vnt_ls.append(Vnt)
+        
+    return Vnt_ls
+
+
+# test passed
 def Vnt_moments(n,k,T,x,y,W_ls,params,moment):
     # moment is positive integer
     V_moment_ls = []
