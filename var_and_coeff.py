@@ -6,49 +6,58 @@ import numpy as np
 
 # DESCRIPTION: This package computes QMLE asymptotic variance, 'alpha' coefficient and 'c0' coefficient. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
 
-def get_asymp_var(estimated_params, x,y, c0, n, T, k, W_ls):
+# test passed
+def get_asymp_var(estimated_params, x,y, n, T, k, W_ls):
     sigma, lam, gamma, rho = estimated_params[:4]
     beta = estimated_params[4:]
-    info_mat = get_info_mat(x,y, c0, W_ls,lam,sigma,k,n,T)
-    var_score = get_var_score()
+    info_mat = get_info_mat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    var_score = get_var_score(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     inv_info_mat = np.linalg.inv(info_mat)
     info_score = np.matmul(inv_info_mat,var_score)
     asymp_var = 1/((n-1)*T)*np.matmul(info_score,inv_info_mat)
     return asymp_var
 
-def get_var_score(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    info_mat = get_info_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-    omega = get_omega(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+# test passed
+def get_var_score(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    info_mat = get_info_mat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega = get_omega(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     return np.array(info_mat+omega).reshape(k+4,k+4)
 
-def get_omega(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    omega_first_part = get_omega_first_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-    omega_second_part = get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-    omega = get_omega_first_part+omega_second_part
+# test passed
+def get_omega(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    omega_first_part = get_omega_first_part(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega_second_part = get_omega_second_part(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    omega = omega_first_part+omega_second_part
     return np.array(omega).reshape(k+4,k+4)
 
-def get_omega_first_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    first_vec = get_first_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T) # 1*(k+2)
-    second_vec = get_second_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T) # 1*(k+2)
+# test passed
+def get_omega_first_part(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    mu3 = Vnt_moments(n,k,T,x,y,W_ls,params,2)
+    first_vec = get_first_omega_vec(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3)
+    second_vec = get_second_omega_vec(x,y,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3) # 1*(k+2)
     first_k_plus_2_row = []
     for i in range(k+2):
-        first_k_plus_2_row = np.zeros(k+2).tolist()
-        first_k_plus_2_row.append(first_vec[i])
-        first_k_plus_2_row.append(second_vec[i])
+        my_row = np.zeros(k+2).tolist()
+        my_row.append(first_vec[i])
+        my_row.append(second_vec[i])
+        first_k_plus_2_row.append(my_row)
         
-    second_row = second_vec.tolist()
+    second_row = first_vec.tolist()
     second_row.extend([0,0])
-    third_row = third_vec.tolist()
+    third_row = second_vec.tolist()
     third_row.extend([0,0])
     
     reshape_ls = first_k_plus_2_row
     reshape_ls.extend([second_row,third_row])
+    print(reshape_ls)
     
     return np.array(reshape_ls).reshape(k+4,k+4)
 
 
-def get_first_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+# test passed
+def get_first_omega_vec(x,y,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
     sum_ls = []
+    c0 = get_c(sigma,lam,gamma, rho, beta)
     for t in range(T):
         Gnt = get_Gnt(W_ls, n, lam, t)
         l_n = np.ones(n).reshape(n,1)
@@ -62,10 +71,11 @@ def get_first_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
             row_vec.append(JG_diag[i]*JZ_tilde[i])
         sum_ls.append(sum(row_vec))
     first_omega_vec = mu3/(sigma**4*(n-1)*T)*sum(sum_ls)
-    return np.array(first_omega_vec).reshape(1,k+2)
+    return np.array(first_omega_vec)
 
 
-def get_second_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+# test passed
+def get_second_omega_vec(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
     sum_ls = []
     for t in range(T):
         Z_tilde = get_Z_tilde(n,k,x,y,W_ls,T,t)
@@ -77,11 +87,13 @@ def get_second_omega_vec(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
             row_vec.append(JZ_tilde[i])
         sum_ls.append(sum(row_vec))
     second_omega_vec = mu3/(2*sigma**6*n*T)*sum(sum_ls)
-    return np.array(second_omega_vec).reshape(1,k+2)
+    return np.array(second_omega_vec)
 
 
-def get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    result = get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+# test passed
+def get_omega_second_part(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    mu4 = Vnt_moments(n,k,T,x,y,W_ls,params,4)
+    result = get_omega_second_part_first_and_second(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     first_num = result[0]
     second_num = result[1]
     first_k_plus_2_row = []
@@ -97,7 +109,11 @@ def get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     return np.array(reshape_ls).reshape(k+4,k+4)
 
 
-def get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+# test passed
+def get_omega_second_part_first_and_second(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    c0 = get_c(sigma,lam,gamma, rho, beta)
+    mu3 = Vnt_moments(n,k,T,x,y,W_ls,params,3)
+    mu4 = Vnt_moments(n,k,T,x,y,W_ls,params,4)
     first_sum_ls = []
     second_sum_ls = []
     third_sum_ls = []
@@ -106,7 +122,7 @@ def get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,bet
         delta = np.array([gamma,rho,*beta]).reshape(k+2,1)
         Gnt = get_Gnt(W_ls, n, lam, t)
         G_ls = []
-        for m in len(T):
+        for m in range(T):
             G_ls.append(get_Gnt(W_ls, n, lam, m))
         G_tilde = Gnt-(1/T)*sum(G_ls)
         l_n = np.ones(n).reshape(n,1)
@@ -408,3 +424,12 @@ def get_Vnt(n,k,T,x,y,W_ls,params,t):
     Vnt = np.array(ynt-LHS).reshape(n,1)
     
     return Vnt
+
+def Vnt_moments(n,k,T,x,y,W_ls,params,moment):
+    # moment is positive integer
+    V_moment_ls = []
+    for i in range(T):
+        V_nt = get_Vnt(n,k,T,x,y,W_ls,params,i)
+        V_moment = V_nt**moment
+        V_moment_ls.append(V_moment)
+    return np.array(V_moment_ls).mean()
