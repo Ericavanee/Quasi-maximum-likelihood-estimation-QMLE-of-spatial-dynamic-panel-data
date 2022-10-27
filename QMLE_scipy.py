@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import NonlinearConstraint
+from var_and_coeff import *
 
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
@@ -165,7 +166,7 @@ def scipy_constraint(T):
     return my_con
 
 
-def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_guess = None, constrain = True):
+def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_guess = None, est_coeff = True, constrain = True):
     r"""Runs scipy.optimize for QMLE
      
     The main idea of this function is to generate QMLE estimators by solving the optimizing function in scipy. 
@@ -184,13 +185,16 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
         List of length T+1 of np.ndarray for weight matrix per time point.
     initial_guess : list; float64
         List of length 5 containing initial guess of each of the parameters; if None, function will set initial_guess to default.
+    est_coeff: Bool
+        True if requested to show estimated coefficients.
     constrain: Bool
         Boolean choosing whether or not to impose constraints on the QMLE problem.
               
     Returns
     -------
-    1D array; float64
-        A list of found estimators in the sequence of sigma, lambda, gamma, rho, and beta.    
+    list
+        A list of found estimators in the sequence of sigma, lambda, gamma, rho, and beta; if est_coeff == True, list in addition includes in sequence c0, alpha, residulas(Vnt), and asymptotic variance. 
+        
     """ 
     n_0 = x_dataset[0].shape[0]
     T_0 = len(x_dataset)
@@ -222,11 +226,25 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
-        return [sigma, lam, gamma, rho,beta]
+        if est_coeff == False:
+            return [sigma, lam, gamma, rho, beta]
+        else:
+            residual = get_residual(n,k,T,x,y,W_ls,my_params)
+            c0 = get_c(sigma,lam,gamma, rho, beta)
+            alpha = get_alpha(sigma,lam,gamma, rho, beta, T)
+            asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+            return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
     else:
         res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
-        return [sigma, lam, gamma, rho,beta]
+        if est_coeff == False:
+            return [sigma, lam, gamma, rho,beta]
+        else:
+            residual = get_residual(n,k,T,x,y,W_ls,my_params)
+            c0 = get_c(sigma,lam,gamma, rho, beta)
+            alpha = get_alpha(sigma,lam,gamma, rho, beta, T)
+            asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+            return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
     
