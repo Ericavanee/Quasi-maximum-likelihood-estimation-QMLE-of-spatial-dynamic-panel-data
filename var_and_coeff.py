@@ -36,10 +36,13 @@ def get_omega_first_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
         first_k_plus_2_row.append(first_vec[i])
         first_k_plus_2_row.append(second_vec[i])
         
-    second_row = second_vec.tolist().extend([0,0])
-    third_row = third_vec.tolist().extend([0,0])
+    second_row = second_vec.tolist()
+    second_row.extend([0,0])
+    third_row = third_vec.tolist()
+    third_row.extend([0,0])
     
-    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    reshape_ls = first_k_plus_2_row
+    reshape_ls.extend([second_row,third_row])
     
     return np.array(reshape_ls).reshape(k+4,k+4)
 
@@ -84,9 +87,12 @@ def get_omega_second_part(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     first_k_plus_2_row = []
     for i in range(k+2):
         first_k_plus_2_row.append(np.zeros(k+4))
-    second_row = np.zeros(k+2).tolist().extend([first_num,second_num])
-    third_row = np.zeros(k+2).tolist().extend([second_num,(mu4-3*sigma**4)/(4*sigma**8)])
-    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    second_row = np.zeros(k+2).tolist()
+    second_row.extend([first_num,second_num])
+    third_row = np.zeros(k+2).tolist()
+    third_row.extend([second_num,(mu4-3*sigma**4)/(4*sigma**8)])
+    reshape_ls = first_k_plus_2_row
+    reshape_ls.extend([second_row,third_row])
     
     return np.array(reshape_ls).reshape(k+4,k+4)
 
@@ -154,18 +160,21 @@ def get_omega_second_part_first_and_second(x,y, c0, W_ls,lam,sigma,gamma,rho,bet
     return [first_term+second_term,third_term+forth_term]
 
 
-def get_info_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+# test passed
+def get_info_mat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     # this is a (k+4)*(k+4) matrix
-    first_info_mat = get_first_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-    second_info_mat = get_second_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    first_info_mat = get_first_infoMat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+    second_info_mat = get_second_infoMat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     info_mat = 1/(sigma**2)*first_info_mat+second_info_mat
     info_mat.reshape(k+4,k+4)
     return info_mat
 
 
-def get_first_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    # (k+3)*(k+3)
-    HnT = get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+# test passed
+
+def get_first_infoMat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    # (k+4)*(k+4)
+    HnT = get_H_mat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     reshape_ls = []
     for i in range(k+3):
         row_vec = HnT[i].tolist()
@@ -175,9 +184,10 @@ def get_first_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     return np.array(reshape_ls).reshape(k+4,k+4) 
 
 
+# test passed
 
-def get_second_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
-    # (k+3)*(k+3)
+def get_second_infoMat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+    # (k+4)*(k+4)
     GJG_JG_tr_ls = []
     JG_tr_ls = []
     for i in range(T):
@@ -203,17 +213,26 @@ def get_second_infoMat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     first_k_plus_2_row = []
     for j in range(k+2):
         first_k_plus_2_row.append(np.zeros(k+4))
-    second_row = np.zeros(k+2).tolist().append(first_trace)
+    
+    
+    second_row = np.zeros(k+2).tolist()
+    second_row.append(first_trace)
     second_row.append(second_trace)
-    third_row = np.zeros(k+2).tolist().append(second_trace)
+    third_row = np.zeros(k+2).tolist()
+    third_row.append(second_trace)
     third_row.append(1/(2*sigma**4))
-    reshape_ls = first_k_plus_2_row.extend([second_row,third_row])
+    reshape_ls = first_k_plus_2_row
+    reshape_ls.extend([second_row,third_row])
     
     return np.array(reshape_ls).reshape(k+4,k+4)        
+     
 
 
-def get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
+# test passed
+
+def get_H_mat(x,y,W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     Hnt_vec_ls = []
+    c0 = get_c(sigma,lam,gamma, rho, beta)
     for i in range(T):
         #delta is (k+2)*1
         delta = [gamma,rho,*beta]
@@ -221,7 +240,7 @@ def get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
         Gnt = get_Gnt(W_ls, n, lam, i)
         #G_tilde is n*n
         G_ls = []
-        for j in len(T):
+        for j in range(T):
             G_ls.append(get_Gnt(W_ls, n, lam, j))
         G_tilde = Gnt-(1/T)*sum(G_ls)
     
@@ -248,9 +267,11 @@ def get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
             ravel_Z_tilde.append(Z_tilde[p])
     
         reshape_list = [ravel_Z_tilde,GZ_delta_c.ravel()]
+        
         final_reshape_list = []
         for q in range(n):
-            row_vec = reshape_list[0][q].append(reshape_list[1][q])
+            row_vec = reshape_list[0][q].tolist()
+            row_vec.append(reshape_list[1][q])
             final_reshape_list.append(row_vec)
         
         H_mat = np.array(final_reshape_list).reshape(n,k+3)
@@ -265,9 +286,10 @@ def get_H_mat(x,y, c0, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
         Hnt_vec_ls.append(Hnt_vec)
         
     H = (1/((n-1)*T))*sum(Hnt_vec_ls)
-    return H    
+    return H        
 
 
+# test passed
 def get_Znt(n,k,x,y,W_ls,t):
     Y_lag = np.array(y[t]).reshape(n,1)
     WY_lag = np.matmul(W_ls[t],Y_lag).reshape(n,1)
@@ -276,14 +298,15 @@ def get_Znt(n,k,x,y,W_ls,t):
     return Znt
 
 
-
+# test passed
 def get_Gnt(W_ls, n, lam, t):
     W = W_ls[t]
     S_nt = np.identity(n) - lam*W
-    Gnt = np.matmul(W,linalg.inv(S_nt)).reshape(n,n)
+    Gnt = np.matmul(W,np.linalg.inv(S_nt)).reshape(n,n)
     return Gnt
 
 
+# test passed
 def get_Z_tilde(n,k,x,y,W_ls,T,t):
     Y_ls = []
     for q in range(T):
@@ -316,6 +339,7 @@ def get_Z_tilde(n,k,x,y,W_ls,T,t):
     return Z_tilde  
 
 
+# test passed
 def regroup_matrix(y_vec, wy_vec, x_vec, n, k):
     # regroup n*1, n*1, n*k into a matrix of n*(k+2)
     my_list = [y_vec,wy_vec,x_vec]
@@ -329,6 +353,7 @@ def regroup_matrix(y_vec, wy_vec, x_vec, n, k):
 
 # get alpha and c
 
+# test passed
 def get_rnt(sigma,lam,gamma, rho, beta, t):
     # first part
     delta = np.array([gamma,rho,*beta]).reshape(k+2,1)
@@ -343,6 +368,7 @@ def get_rnt(sigma,lam,gamma, rho, beta, t):
     return rnt
 
 
+# test passed
 def get_c(sigma,lam,gamma, rho, beta):
     sum_ls = []
     for i in range(T):
@@ -352,6 +378,7 @@ def get_c(sigma,lam,gamma, rho, beta):
     return c0  
 
 
+# test passed
 def get_alpha_t(sigma,lam,gamma, rho, beta, t):
     l_n = np.ones(n).reshape(n,1)
     rnt = get_rnt(sigma,lam,gamma, rho, beta, t)
@@ -360,3 +387,24 @@ def get_alpha_t(sigma,lam,gamma, rho, beta, t):
     return alpha_t
 
 
+# test passed
+def get_Vnt(n,k,T,x,y,W_ls,params,t):
+    # get components
+    sigma, lam, gamma, rho = params[:4]
+    beta = params[4:]
+    ynt = np.array(y[t+1]).reshape(n,1)
+    y_lag = np.array(y[t]).reshape(n,1)
+    W = np.array(W_ls[t+1]).reshape(n,n)
+    W_lag = np.array(W_ls[t]).reshape(n,n)
+    xnt = np.array(x[t]).reshape(n,k)
+    c0 = get_c(sigma,lam,gamma, rho, beta)
+    alpha_t = get_alpha_t(sigma,lam,gamma, rho, beta, t)
+    l_n = np.ones(n).reshape(n,1)
+    
+    # get LHS
+    LHS = lam*np.matmul(W,ynt)+gamma*y_lag+rho*np.matmul(W_lag,y_lag)+np.matmul(xnt,np.array(beta).reshape(k,1))+c0+alpha_t*l_n
+    
+    # get Vnt
+    Vnt = np.array(ynt-LHS).reshape(n,1)
+    
+    return Vnt
