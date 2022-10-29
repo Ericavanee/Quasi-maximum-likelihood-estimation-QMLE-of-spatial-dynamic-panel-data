@@ -219,8 +219,11 @@ class scipy_res:
         print()
         
         # display estimated alpha
-        print("Estimated alpha: ")
-        alpha_data = np.array(self.alpha).reshape(1,len(self.alpha))
+        print("Estimated alpha (display first 10 rows): ")
+        if len(self.alpha) > 10:
+            alpha_data = np.array(self.alpha.tolist()[:10]).reshape(1,10)
+        else:
+            alpha_data = np.array(self.alpha).reshape(1,len(self.alpha))
         alpha_col_names = []
         for i in range(len(self.alpha)):
             alpha_col_names.append("alpha_"+str(i))
