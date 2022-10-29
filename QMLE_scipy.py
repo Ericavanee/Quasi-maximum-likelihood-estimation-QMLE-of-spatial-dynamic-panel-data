@@ -166,7 +166,7 @@ def scipy_constraint(T):
     return my_con
 
 
-def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_guess = None, est_coeff = True, constrain = True):
+def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None, est_coeff = True, constrain = True):
     r"""Runs scipy.optimize for QMLE
      
     The main idea of this function is to generate QMLE estimators by solving the optimizing function in scipy. 
@@ -212,10 +212,6 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
     x = x_dataset
     global y
     y = y_attribute
-    global c
-    c = c0
-    global alpha
-    alpha = alpha_0
     global W_ls
     W_ls = Weight_ls
     # implement the constrained version
@@ -227,12 +223,18 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
         if est_coeff == False:
+            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
             return [sigma, lam, gamma, rho, beta]
         else:
             residual = get_residual(n,k,T,x,y,W_ls,my_params)
-            c0 = get_c(sigma,lam,gamma, rho, beta)
-            alpha = get_alpha(sigma,lam,gamma, rho, beta, T)
+            c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+            alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
             asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
+            print("c0 : ", c0)
+            print("alpha : ", alpha)
+            print("residuals: ", residual)
+            print("asymptotic variance: ", asymp_var)
             return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
     else:
         res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
@@ -240,11 +242,17 @@ def QMLE_scipy_estimate(alpha_0, c0, x_dataset, y_attribute, Weight_ls, initial_
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
         if est_coeff == False:
+            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
             return [sigma, lam, gamma, rho,beta]
         else:
             residual = get_residual(n,k,T,x,y,W_ls,my_params)
-            c0 = get_c(sigma,lam,gamma, rho, beta)
-            alpha = get_alpha(sigma,lam,gamma, rho, beta, T)
+            c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+            alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
             asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
+            print("c0 : ", c0)
+            print("alpha : ", alpha)
+            print("residuals: ", residual)
+            print("asymptotic variance: ", asymp_var)
             return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
     
