@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import NonlinearConstraint
+from tabulate import tabulate
+
 from var_and_coeff import *
 
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
-# Version: Oct 23, 2022
+# Version: Oct 28, 2022
 
 # DESCRIPTION: This package computes QMLE estimators with k-D features and exogenous, potentially time-varying weight matrices using scipy.optimize. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
 
@@ -166,6 +168,94 @@ def scipy_constraint(T):
     return my_con
 
 
+# create the result class for QMLE_scipy
+class scipy_res:
+    def __init__(self, parameters, c0, alpha, residual, asymptotic_var):
+        sigma, lam, gamma, rho = parameters[:4]
+        beta = parameters[4:]
+        self.parameters = [sigma, lam, gamma, rho, beta]
+        self.c0 = c0
+        self.alpha = alpha
+        self.residual = residual
+        self.asymptotic_var = asymptotic_var
+    
+    def residual_mean(self):
+        return np.array(self.residual).mean()
+    
+    def residual_std(self):
+        return np.array(self.residual).std()
+    
+    def sigma(self):
+        return self.parameters[0]
+    
+    def lam(self):
+        return self.parameters[1]
+    
+    def gamma(self):
+        return self.parameters[2]
+    
+    def rho(self):
+        return self.parameters[3]
+    
+    def beta(self):
+        return self.parameters[4:]
+        
+    def print_table(self):
+        # display table of residuals
+        print("Residuals:")
+        residual_data = np.percentile(np.array(self.residual), [0, 25, 50, 75, 100]).reshape(1,5)
+        residual_col_names = ["Min", "1Q", "Median", "3Q", "Max"]
+        print(tabulate(residual_data, headers=residual_col_names,tablefmt="simple"))
+        print()
+        
+        # display estimated parameters
+        sigma, lam, gamma, rho = self.parameters[:4]
+        beta = self.parameters[4:]
+        print("Estimated Parameters:")
+        param_data = np.array([sigma,lam,gamma,rho,beta],dtype=object).reshape(1,5)
+        param_col_names = ["Sigma", "Lambda", "Gamma", "Rho", "Beta"]
+        print(tabulate(param_data, headers=param_col_names,tablefmt="simple"))
+        print()
+        
+        # display estimated alpha
+        print("Estimated alpha: ")
+        alpha_data = np.array(self.alpha).reshape(1,len(self.alpha))
+        alpha_col_names = []
+        for i in range(len(self.alpha)):
+            alpha_col_names.append("alpha_"+str(i))
+        print(tabulate(alpha_data, headers=alpha_col_names,tablefmt="simple"))
+        print()
+        
+        # display estimated c0
+        print("Estimated c0 (display first 10 rows): ")
+        if len(self.c0) > 10:
+            c0_data = np.array(self.c0.tolist()[:10]).reshape(1,10)
+        else:
+            c0_data = np.array(self.c0).reshape(1,len(self.c0))
+        c0_col_names = []
+        for i in range(len(self.c0)):
+            c0_col_names.append("c0_"+str(i))
+        print(tabulate(c0_data, headers=c0_col_names,tablefmt="simple"))
+        print()
+        
+        # display asymptotic variance
+        print("Estimated asympotitic variance: ")
+        beta_len = len(beta)
+        beta_names = []
+        for i in range(beta_len):
+            beta_names.append("Beta_"+str(i))
+        asymp_var_names = ["Gamma","Rho"]
+        asymp_var_names.extend(beta_names)
+        asymp_var_names.extend(["Lambda", "Sigma^2"])
+        asymp_var_data = []
+        for i in range(beta_len+4):
+            temp = [asymp_var_names[i]]
+            temp.extend(self.asymptotic_var[i])
+            asymp_var_data.append(temp)
+        print(tabulate(asymp_var_data, headers=asymp_var_names,tablefmt="simple"))
+        print()
+
+
 def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None, est_coeff = True, constrain = True):
     r"""Runs scipy.optimize for QMLE
      
@@ -192,9 +282,8 @@ def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None,
               
     Returns
     -------
-    list
-        A list of found estimators in the sequence of sigma, lambda, gamma, rho, and beta; if est_coeff == True, list in addition includes in sequence c0, alpha, residulas(Vnt), and asymptotic variance. 
-        
+    object
+        Returns a scipy.res object that contains attributes including parameters, c0, alpha, residual, and asymptotic_var.        
     """ 
     n_0 = x_dataset[0].shape[0]
     T_0 = len(x_dataset)
@@ -222,37 +311,23 @@ def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None,
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
-        if est_coeff == False:
-            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
-            return [sigma, lam, gamma, rho, beta]
-        else:
-            residual = get_residual(n,k,T,x,y,W_ls,my_params)
-            c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-            alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-            asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
-            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
-            print("c0 : ", c0)
-            print("alpha : ", alpha)
-            print("residuals: ", residual)
-            print("asymptotic variance: ", asymp_var)
-            return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
+        residual = get_residual(n,k,T,x,y,W_ls,my_params)
+        c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+        alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+        asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+        # now create the scipy_res object
+        my_res = scipy_res(my_params,c0,alpha,residual,asymp_var)
+        return my_res
     else:
         res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
-        if est_coeff == False:
-            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
-            return [sigma, lam, gamma, rho,beta]
-        else:
-            residual = get_residual(n,k,T,x,y,W_ls,my_params)
-            c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-            alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-            asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
-            print("[sigma,lam,gamma,rho,beta] = ",[sigma, lam, gamma, rho, beta])
-            print("c0 : ", c0)
-            print("alpha : ", alpha)
-            print("residuals: ", residual)
-            print("asymptotic variance: ", asymp_var)
-            return [[sigma, lam, gamma, rho, beta],c0,alpha,residual,asymp_var]
+        residual = get_residual(n,k,T,x,y,W_ls,my_params)
+        c0 = get_c(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+        alpha = get_alpha(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
+        asymp_var = get_asymp_var(my_params, x,y, n, T, k, W_ls)
+        # now create the scipy_res object
+        my_res = scipy_res(my_params,c0,alpha,residual,asymp_var)
+        return my_res
     
