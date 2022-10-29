@@ -173,7 +173,8 @@ class scipy_res:
     def __init__(self, parameters, c0, alpha, residual, asymptotic_var):
         sigma, lam, gamma, rho = parameters[:4]
         beta = parameters[4:]
-        self.parameters = [sigma, lam, gamma, rho, beta]
+        self.params = [sigma, lam, gamma, rho, beta]
+        self.parameters = parameters
         self.c0 = c0
         self.alpha = alpha
         self.residual = residual
