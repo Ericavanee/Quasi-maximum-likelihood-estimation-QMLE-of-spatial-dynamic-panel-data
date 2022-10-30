@@ -121,56 +121,69 @@ def generate_samples_scipy_fix_weight(n,T,t_theta,g_theta, W_ls, N=50, constrain
                 
     Returns
     -------
-    list; list; float64
-        returns a list of estimated parameter list for each experiment.
+    list; object
+        returns a list of the scipy_res objects.
      """
     # set up true and guess parameters
-    t_sig, t_lam, t_gamma, t_rho, t_beta = t_theta
-    g_sig, g_lam, g_gamma, g_rho, g_beta = g_theta
+    t_sig, t_lam, t_gamma, t_rho = t_theta[:4]
+    t_beta = t_theta[4:]
+    g_sig, g_lam, g_gamma, g_rho = g_theta[:4]
+    g_beta = g_theta[4:]
+    k = len(g_beta)
     # set up initial guess
-    initial_guess = [g_sig, g_lam, g_gamma, g_rho, g_beta]
+    initial_guess = g_theta
     # sample list
     sample_ls = []
-    for k in range(N):
+    for r in range(N):
         # set up samples
-        alpha = np.random.normal(0,1,T).transpose()
+        alpha = np.random.normal(0,1,T).reshape(n,1)
+        # avoid extreme values
         alpha = np.nan_to_num(alpha)
         alpha[alpha == -np.inf] = 0
         alpha[alpha == np.inf] = 0
-        c0 = np.random.normal(0,1,n).transpose()
+        # avoid extreme values
+        c0 = np.random.normal(0,1,n).reshape(n,1)
         c0 = np.nan_to_num(c0)
         c0[c0 == -np.inf] = 0
         c0[c0 == np.inf] = 0
+        
         x = []
         for i in range(T):
-            tem = np.random.normal(0,1,n).transpose()
+            tem = np.random.normal(0,1,n*k).reshape(n,k)
+            # avoid extreme values
             tem = np.nan_to_num(tem)
             tem[tem == -np.inf] = 0
             tem[tem == np.inf]=0
             x.append(tem)
+            
         V_nt = []
         for i in range(T):
-            tem = np.random.normal(0,t_sig,n).transpose()
+            tem = np.random.normal(0,t_sig,n).reshape(n,1)
+            # avoid extreme values
             tem = np.nan_to_num(tem)
             tem[tem == -np.inf] = 0
             tem[tem == np.inf]=0
             V_nt.append(tem)
-        Y0 = np.random.normal(0,1,n).transpose()
+        
+        Y0 = np.random.normal(0,1,n).reshape(n,1)
         Y_ls = []
         Y_ls.append(Y0)
+        
         for i in range(T):
-            l_n = np.ones(n).transpose()
-            c_vec = t_gamma*Y_ls[i]+t_rho*np.matmul(W_ls[i],Y_ls[i])+t_beta*x[i]+c0+alpha[i]*l_n+V_nt[i]
+            l_n = np.ones(n).reshape(n,1)
+            c_vec = t_gamma*Y_ls[i]+t_rho*np.matmul(W_ls[i],Y_ls[i])+np.matmul(x[i],np.array(t_beta).reshape(k,1)).reshape(n,1)+c0+alpha[i]*l_n+V_nt[i]
             Y_nt = np.matmul(np.linalg.inv(np.identity(n)-t_lam*W_ls[i+1]),c_vec)
             Y_ls.append(Y_nt)
+        
         # run scipy optimize
-        sample = QMLE_scipy_estimate(n,T, alpha, c0, x, Y_ls, W_ls, initial_guess, constrain)
+        sample = QMLE_scipy_estimate(x, Y_ls, W_ls, initial_guess, constrain).params
         sample_ls.append(sample)
+        
     # return sample list
     return sample_ls
 
 
-def generate_samples_scipy_flex_weight(n,T,t_theta,g_theta, N=500, constrain=True):
+def generate_samples_scipy_flex_weight(n,T, t_theta,g_theta, N=500, constrain=True):
     r"""generate list of estimators from monte-carlo experiments with changing weight matrices
      
     The main idea of this function is to generate a list of returned estimators from multiple monte-carlo experiments without fixing weight matrices for each experiment.
@@ -196,23 +209,29 @@ def generate_samples_scipy_flex_weight(n,T,t_theta,g_theta, N=500, constrain=Tru
         returns a list of estimated parameter list for each experiment.
      """
     # set up true and guess parameters
-    t_sig, t_lam, t_gamma, t_rho, t_beta = t_theta
-    g_sig, g_lam, g_gamma, g_rho, g_beta = g_theta
-    initial_guess = [g_sig, g_lam, g_gamma, g_rho, g_beta]
+    t_sig, t_lam, t_gamma, t_rho = t_theta[:4]
+    t_beta = t_theta[4:]
+    g_sig, g_lam, g_gamma, g_rho = g_theta[:4]
+    g_beta = g_theta[4:]
+    k = len(g_beta)
+    # set up initial guess
+    initial_guess = g_theta
+    
     sample_ls = []
-    for k in range(N):
+    for r in range(N):
         # set up samples
-        alpha = np.random.normal(0,1,T).transpose()
+        alpha = np.random.normal(0,1,T).reshape(n,1)
         alpha = np.nan_to_num(alpha)
         alpha[alpha == -np.inf] = 0
         alpha[alpha == np.inf] = 0
-        c0 = np.random.normal(0,1,n).transpose()
+        c0 = np.random.normal(0,1,n).reshape(n,1)
         c0 = np.nan_to_num(c0)
         c0[c0 == -np.inf] = 0
         c0[c0 == np.inf] = 0
         x = []
         for i in range(T):
-            tem = np.random.normal(0,1,n).transpose()
+            tem = np.random.normal(0,1,n*k).reshape(n,k)
+            # avoid extreme values
             tem = np.nan_to_num(tem)
             tem[tem == -np.inf] = 0
             tem[tem == np.inf]=0
@@ -226,30 +245,35 @@ def generate_samples_scipy_flex_weight(n,T,t_theta,g_theta, N=500, constrain=Tru
                 W_ls.append(w0)
             else:
                 W_ls.append(w1)
+                
         V_nt = []
         for i in range(T):
-            tem = np.random.normal(0,t_sig,n).transpose()
+            tem = np.random.normal(0,t_sig,n).reshape(n,1)
+            # avoid extreme values
             tem = np.nan_to_num(tem)
             tem[tem == -np.inf] = 0
             tem[tem == np.inf]=0
             V_nt.append(tem)
-        Y0 = np.random.normal(0,1,n).transpose()
+            
+        Y0 = np.random.normal(0,1,n).reshape(n,1)
         Y_ls = []
         Y_ls.append(Y0)
+        
         for i in range(T):
-            l_n = np.ones(n).transpose()
-            c_vec = t_gamma*Y_ls[i]+t_rho*np.matmul(W_ls[i],Y_ls[i])+t_beta*x[i]+c0+alpha[i]*l_n+V_nt[i]
+            l_n = np.ones(n).reshape(n,1)
+            c_vec = t_gamma*Y_ls[i]+t_rho*np.matmul(W_ls[i],Y_ls[i])+np.matmul(x[i],np.array(t_beta).reshape(k,1)).reshape(n,1)+c0+alpha[i]*l_n+V_nt[i]
             Y_nt = np.matmul(np.linalg.inv(np.identity(n)-t_lam*W_ls[i+1]),c_vec)
             Y_ls.append(Y_nt)
+    
         # run scipy optimize
-        sample = QMLE_scipy_estimate(n,T, alpha, c0, x, Y_ls, W_ls, initial_guess, constrain)
+        sample = QMLE_scipy_estimate(x, Y_ls, W_ls, initial_guess, constrain).params
         sample_ls.append(sample)
     # return sample list
     return sample_ls
 
 
 
-def obtain_table_stats(sample_ls,t_theta):
+def obtain_table_stats(sample_ls,t_theta,T):
     r"""generate table of stats for the performance of estimators from monte-carlo experiments
      
     The main idea of this function is to generate a table of stats for the performance of estimators from monte-carlo experiments.
@@ -265,12 +289,16 @@ def obtain_table_stats(sample_ls,t_theta):
     -------
     BLANK; prints table as side-effect.
      """
-    t_sig,t_lam,t_gamma,t_rho,t_beta = t_theta
+    t_sig, t_lam, t_gamma, t_rho = t_theta[:4]
+    t_beta = t_theta[4:]
+    k = len(t_beta)
+    
     gam_ls = []
     rho_ls = []
     beta_ls = []
     lam_ls = []
     sig_ls = []
+    
     n = len(sample_ls)
     for i in range(n):
         sig_ls.append(sample_ls[i][0])
@@ -278,37 +306,46 @@ def obtain_table_stats(sample_ls,t_theta):
         gam_ls.append(sample_ls[i][2])
         rho_ls.append(sample_ls[i][3])
         beta_ls.append(sample_ls[i][4])
+        
     # bias
     gam_bias = np.array(gam_ls).mean()-t_gamma
     rho_bias = np.array(rho_ls).mean()-t_rho
-    beta_bias = np.array(beta_ls).mean()-t_beta
+    beta_map = map(np.mean, zip(*beta_ls))
+    beta_bias = list(beta_map)
+    for i in range(k):
+        beta_bias[i] = beta_bias[i]-t_beta[i]
     lam_bias = np.array(lam_ls).mean()-t_lam
     sig_bias = np.array(sig_ls).mean()-t_sig
-    bias = [gam_bias, rho_bias, beta_bias,lam_bias, sig_bias]
+    bias = [sig_bias, lam_bias, gam_bias,rho_bias, beta_bias]
     
     # rmse
     gam_rmse = sqrt(mean_squared_error(np.array([t_gamma]*n), np.array(gam_ls)))
     rho_rmse = sqrt(mean_squared_error(np.array([t_rho]*n), np.array(rho_ls)))
-    beta_rmse = sqrt(mean_squared_error(np.array([t_beta]*n), np.array(beta_ls)))
+    t_beta_list = np.repeat(t_beta,n).reshape(k,n)
+    emp_beta = list(zip(*beta_ls))
+    beta_rmse = []
+    for i in range(k):
+        beta_rmse.append(mean_squared_error(t_beta_list[i],emp_beta[i]))
     lam_rmse = sqrt(mean_squared_error(np.array([t_lam]*n), np.array(lam_ls)))
     sig_rmse = sqrt(mean_squared_error(np.array([t_sig]*n), np.array(sig_ls)))
-    rmse = [gam_rmse, rho_rmse, beta_rmse,lam_rmse, sig_rmse]
+    rmse = [sig_rmse, lam_rmse, gam_rmse,rho_rmse, beta_rmse]
     
     # sd
     gam_sd = np.array(gam_ls).std()
     rho_sd = np.array(rho_ls).std()
     lam_sd = np.array(lam_ls).std()
     sig_sd = np.array(sig_ls).std()
-    beta_sd = np.array(beta_ls).std()
-    sd = [gam_sd, rho_sd, beta_sd,lam_sd, sig_sd]
+    temp = map(np.std, zip(*beta_ls))
+    beta_sd = list(temp)
+    sd = [sig_sd, lam_sd, gam_sd,rho_sd, beta_sd]
     
     # print table
-    bias_ls = ["Bias", gam_bias, rho_bias, beta_bias, lam_bias, sig_bias]
-    sd_ls = ["SD", gam_sd, rho_sd, beta_sd, lam_sd, sig_sd]
-    rmse_ls = ["RMSE", gam_rmse, rho_rmse, beta_rmse, lam_rmse, sig_rmse]
+    bias_ls = ["Bias", sig_bias, lam_bias, gam_bias,rho_bias, beta_bias]
+    sd_ls = ["SD", sig_sd, lam_sd, gam_sd,rho_sd, beta_sd]
+    rmse_ls = ["RMSE", sig_rmse, lam_rmse, gam_rmse,rho_rmse, beta_rmse]
     data = [bias_ls, sd_ls, rmse_ls]
     #define header names
-    col_names = ["Measures (n={}; T={}; theta={})".format(n, T, t_theta), "gamma", "rho", "beta", "lambda", "sigma"]
+    col_names = ["Measures (n={}; T={})".format(n, T), "sigma", "lambda", "gamma", "rho", "beta"]
     # display table
     print(tabulate(data, headers=col_names))
     
