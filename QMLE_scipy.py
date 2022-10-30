@@ -5,6 +5,7 @@ from tabulate import tabulate
 
 from var_and_coeff import *
 
+
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
 # Version: Oct 28, 2022
@@ -310,7 +311,14 @@ def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None,
     # implement the constrained version
     if constrain == True:
         const = scipy_constraint(T)
-        res = minimize(QMLE_scipy_obj, initial_guess, method='trust-constr', constraints = const)
+        while True:
+            try:
+                res = minimize(QMLE_scipy_obj, initial_guess, method='trust-constr', constraints = const)
+            except:
+                 continue
+            else:
+                #the rest of the code
+                break
         # return maximizing parameters 
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
@@ -323,7 +331,14 @@ def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None,
         my_res = scipy_res(my_params,c0,alpha,residual,asymp_var)
         return my_res
     else:
-        res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
+        while True:
+            try:
+                res = minimize(QMLE_scipy_obj, initial_guess, method='nelder-mead', options={'xatol': 0.00001, 'disp': False})
+            except:
+                 continue
+            else:
+                #the rest of the code
+                break
         my_params = res.x
         sigma, lam, gamma, rho = my_params[:4]
         beta = my_params[4:]
