@@ -3,12 +3,15 @@ from scipy.optimize import minimize
 from scipy.optimize import NonlinearConstraint
 from tabulate import tabulate
 
+import pylab
+import scipy.stats as stats
+
 from var_and_coeff import *
 
 
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
-# Version: Oct 28, 2022
+# Version: Nov 2nd, 2022
 
 # DESCRIPTION: This package computes QMLE estimators with k-D features and exogenous, potentially time-varying weight matrices using scipy.optimize. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
 
@@ -186,6 +189,25 @@ class scipy_res:
     
     def residual_std(self):
         return np.array(self.residual).std()
+    
+    def plot_residual(self,t = 1, plot_all = False):
+        resi = self.residual
+        if plot_all == False:
+            print("Plotting qqplot of residuals at time t =", t, ".")
+            print()
+            tp = t-1
+            measurements = resi[tp].ravel()  
+            stats.probplot(measurements, dist="norm", plot=pylab)
+            pylab.show()
+        else :
+            T = len(resi)
+            print("Plotting qqplot of residuals from t = 1 to t = ",T, "." )
+            print()
+            for i in range(T):
+                measurements = resi[i].ravel()  
+                stats.probplot(measurements, dist="norm", plot=pylab)
+                pylab.show()
+                
     
     def sigma(self):
         return self.parameters[0]
