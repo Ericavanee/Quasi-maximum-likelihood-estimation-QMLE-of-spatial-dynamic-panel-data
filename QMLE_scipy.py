@@ -283,7 +283,7 @@ class scipy_res:
         print()
 
 
-def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None, est_coeff = True, constrain = True):
+def QMLE_scipy_estimate(x_dataset, y_attribute, Weight_ls, initial_guess = None, constrain = True):
     r"""Runs scipy.optimize for QMLE
      
     The main idea of this function is to generate QMLE estimators by solving the optimizing function in scipy. 
