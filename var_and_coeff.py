@@ -2,9 +2,9 @@ import numpy as np
 
 # Authors: Authors: Agostino Capponi, Mohammadreza Bolandnazar, Erica Zhang
 # License: MIT License
-# Version: Oct 23, 2022
+# Version: Nov 2nd, 2022
 
-# DESCRIPTION: This package computes QMLE asymptotic variance, 'alpha' coefficient and 'c0' coefficient. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
+# DESCRIPTION: This package computes QMLE asymptotic variance, 'alpha' coefficient, 'c0' coefficient, as well as regression residuals. Implementation is based on the QMLE model developed by Lee & Yu (2011): https://www.sciencedirect.com/science/article/pii/S0304407616302147
 
 # test passed
 def get_asymp_var(estimated_params, x,y, n, T, k, W_ls):
@@ -12,7 +12,7 @@ def get_asymp_var(estimated_params, x,y, n, T, k, W_ls):
     beta = estimated_params[4:]
     info_mat = get_info_mat(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
     var_score = get_var_score(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T)
-    inv_info_mat = np.linalg.inv(info_mat)
+    inv_info_mat = np.linalg.pinv(info_mat) # generalized inverse
     info_score = np.matmul(inv_info_mat,var_score)
     asymp_var = 1/((n-1)*T)*np.matmul(info_score,inv_info_mat)
     return asymp_var
@@ -32,15 +32,15 @@ def get_omega(x,y, W_ls,lam,sigma,gamma,rho,beta,k,n,T):
     mu4 = Vnt_moments(n,k,T,x,y,W_ls,params,4)
     
     omega_first_part = get_omega_first_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3)
-    omega_second_part = get_omega_second_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3,mu4)
+    omega_second_part = get_omega_second_part(x,y,c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3,mu4)
     omega = omega_first_part+omega_second_part
     return np.array(omega).reshape(k+4,k+4)
 
 # test passed
-def get_omega_first_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
+def get_omega_first_part(x,y,c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
     
     first_vec = get_first_omega_vec(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3)
-    second_vec = get_second_omega_vec(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3) # 1*(k+2)
+    second_vec = get_second_omega_vec(x,y,c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3) # 1*(k+2)
     
     first_k_plus_2_row = []
     for i in range(k+2):
@@ -61,7 +61,7 @@ def get_omega_first_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
 
 
 # test passed
-def get_first_omega_vec(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):    
+def get_first_omega_vec(x,y,c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):    
     sum_ls = []
     for t in range(T):
         Gnt = get_Gnt(W_ls, n, lam, t) # no lag, plus one is included in the function
@@ -96,7 +96,7 @@ def get_second_omega_vec(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T,mu3):
 
 
 # test passed
-def get_omega_second_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3,mu4):
+def get_omega_second_part(x,y,c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3,mu4):
     result = get_omega_second_part_first_and_second(x,y, c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3, mu4)
     first_num = result[0]
     second_num = result[1]
@@ -115,6 +115,7 @@ def get_omega_second_part(x,y,c0,V_ls,W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3,m
 
 # test passed
 def get_omega_second_part_first_and_second(x,y, c0, V_ls, W_ls,lam,sigma,gamma,rho,beta,k,n,T, mu3, mu4):
+    # y, V_ls, c0 have all been reshaped correctly
     first_sum_ls = []
     second_sum_ls = []
     third_sum_ls = []
@@ -122,11 +123,12 @@ def get_omega_second_part_first_and_second(x,y, c0, V_ls, W_ls,lam,sigma,gamma,r
     for t in range(T):
         delta = np.array([gamma,rho,*beta]).reshape(k+2,1)
         G_tilde = get_Gnt_tilde(W_ls, n, lam, t, T)
+        Gnt = get_Gnt(W_ls, n, lam, t)
         
         l_n = np.ones(n).reshape(n,1)
         J_n = np.identity(n)-(1/n)*np.matmul(l_n,l_n.transpose())
         
-        GZ_tilde_u = get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t)
+        GZ_tilde_u = get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t, T)
         
         # arange components
         JG = np.matmul(J_n,Gnt).reshape(n,n)
@@ -148,7 +150,7 @@ def get_omega_second_part_first_and_second(x,y, c0, V_ls, W_ls,lam,sigma,gamma,r
         forth_row_ls = []
         
         for i in range(n):
-            first_row_ls.append(*(JG_diag[i]*JGZDelta_c[i]))
+            first_row_ls.append(*(JG_diag[i]*JGZ_u_Delta_c[i]))
             second_row_ls.append(JG_sqr_diag[i])
             third_row_ls.append(*(JGZ_u_Delta_c[i]))
             forth_row_ls.append(JG.trace())
@@ -167,8 +169,6 @@ def get_omega_second_part_first_and_second(x,y, c0, V_ls, W_ls,lam,sigma,gamma,r
     
     #altogether
     return [first_term+second_term,third_term+forth_term]
-
-
 
 
 # test passed
@@ -317,6 +317,7 @@ def get_Gnt(W_ls, n, lam, t):
     Gnt = np.matmul(W,np.linalg.inv(S_nt)).reshape(n,n)
     return Gnt
 
+# test passed
 def get_Gnt_tilde(W_ls, n, lam, t, T):
     Gnt = get_Gnt(W_ls, n, lam, t)
     sum_ls = []
@@ -353,18 +354,21 @@ def get_Z_tilde(n,k,x,y,W_ls,T,t):
     return Z_tilde 
 
 
+# passed
 def get_Z_tilde_u(c0,V_ls,n,k,x,W_ls,lam,gamma,rho,beta,T,t):
     # first part is n*1, lag
+    # V_ls, c0 has been reshaped to (n,1)
     mu_tilde_lag = get_mu_tilde(W_ls,lam,rho,gamma,n,t,T)
-    c0 = np.array(c0).reshape(n,1)
     chi_tilde_lag = get_chi_tilde(x,W_ls,lam,rho,gamma,n,t,T)
     beta = np.array(beta).reshape(k,1)
     Unt_lag = get_Unt(W_ls,V_ls,lam,rho,gamma,n,t)
+    W_lag = W_ls[t]
     
-    fist_part = np.matmul(mu_tilde_lag,c0)+np.matmul(chi_tilde_lag,beta)+Unt_lag
+    first_part = np.matmul(mu_tilde_lag,c0).reshape(n,1)+np.matmul(chi_tilde_lag,beta).reshape(n,1)+Unt_lag
     
     # second part is n*1
-    Wchi_tilde_lag = get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t)
+    Wchi_tilde_lag = get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t,T)
+    Wmu_tilde_lag = get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t, T)
     
     second_part = np.matmul(Wmu_tilde_lag,c0)+np.matmul(Wchi_tilde_lag,beta)+np.matmul(W_lag,Unt_lag)
     
@@ -375,20 +379,23 @@ def get_Z_tilde_u(c0,V_ls,n,k,x,W_ls,lam,gamma,rho,beta,T,t):
     # Z_tilde_u is n*(k+2)
     Z_tilde_u = regroup_matrix(first_part,second_part,third_part, n, k)
     
+    return Z_tilde_u
     
     
-def get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t):
+    
+def get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t, T):
     # n*(k+2)
-    Gnt_mu_tilde_lag = get_Gnt_mu_tilde_lag(W_ls,lam,rho,gamma,n,t)
-    Gnt_chi_tilde_lag = get_Gnt_chi_tilde_lag(x,W_ls,lam,rho,gamma,n,t)
+    Gnt_mu_tilde_lag = get_Gnt_mu_tilde_lag(W_ls,lam,rho,gamma,n,t, T)
+    Gnt_chi_tilde_lag = get_Gnt_chi_tilde_lag(x,W_ls,lam,rho,gamma,n,t, T)
+    k = len(beta)
     beta = np.array(beta).reshape(k,1)
     Gnt = get_Gnt(W_ls, n, lam, t) # no lag, plus one is contained in the function
     Unt_lag = get_Unt(W_ls,V_ls,lam,rho,gamma,n,t) # lag
     # first part is n*1
     first_part = np.matmul(Gnt_mu_tilde_lag,c0).reshape(n,1)+np.matmul(Gnt_chi_tilde_lag,beta).reshape(n,1)+np.matmul(Gnt,Unt_lag).reshape(n,1)
     
-    Wmu_tilde_lag = get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t)
-    Wchi_tilde_lag = get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t)
+    Wmu_tilde_lag = get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t, T)
+    Wchi_tilde_lag = get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t, T)
     W_lag = W_ls[t]
     GWmu_tilde = np.matmul(Gnt,Wmu_tilde_lag).reshape(n,n)
     GWmu_tilde_c0 = np.matmul(GWmu_tilde,c0).reshape(n,1)
@@ -400,7 +407,7 @@ def get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t):
     second_part = GWmu_tilde_c0+GWchi_tilde_beta+GW_lag_Unt_lag
     
     # third part is n*k
-    third_part = get_Gnt_X_tilde(x, W_ls, n, lam, t)
+    third_part = get_Gnt_X_tilde(x, W_ls, n, lam, t, T)
     
     # putting together n*(k+2)
     GZ_tilde_u = regroup_matrix(first_part,second_part,third_part, n, k)
@@ -408,7 +415,7 @@ def get_GZ_tilde_u(x,c0,V_ls,W_ls,lam,rho,gamma,beta,n,t):
     return GZ_tilde_u
 
     
-def get_Gnt_X_tilde(x, W_ls, n, lam, t):
+def get_Gnt_X_tilde(x, W_ls, n, lam, t, T):
     # n*k
     Gnt = get_Gnt(W_ls, n, lam, t) # no lag, plus one is contained in the function
     sum_ls = []
@@ -419,7 +426,7 @@ def get_Gnt_X_tilde(x, W_ls, n, lam, t):
     return Gnt_X_tilde
     
     
-def get_Gnt_mu_tilde_lag(W_ls,lam,rho,gamma,n,t):
+def get_Gnt_mu_tilde_lag(W_ls,lam,rho,gamma,n,t, T):
     # n*n
     Gnt = get_Gnt(W_ls, n, lam, t) # no lag, plus one is contained in the function
     munt_lag = get_mu(W_ls,lam,rho,gamma,n,t) # lag
@@ -432,8 +439,8 @@ def get_Gnt_mu_tilde_lag(W_ls,lam,rho,gamma,n,t):
     return Gnt_mu_tilde_lag
 
 
-def get_Gnt_chi_tilde_lag(x,W_ls,lam,rho,gamma,n,t):
-    # n*(k+2)
+def get_Gnt_chi_tilde_lag(x,W_ls,lam,rho,gamma,n,t, T):
+    # n*k
     Gnt = get_Gnt(W_ls, n, lam, t) # no lag, plus one is contained in the function
     chi_lag = get_chi(x,W_ls,lam,rho,gamma,n,t) # lag
     sum_ls = []
@@ -445,7 +452,8 @@ def get_Gnt_chi_tilde_lag(x,W_ls,lam,rho,gamma,n,t):
     return Gnt_chi_tilde_lag
     
     
-def get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t):
+def get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t, T):
+    # n*n
     W_lag = W_ls[t]
     munt_lag = get_mu(W_ls,lam,rho,gamma,n,t)
     sum_ls = []
@@ -453,11 +461,12 @@ def get_Wmu_tilde_lag(W_ls,lam,rho,gamma,n,t):
         W = W_ls[i]
         munt = get_mu(W_ls,lam,rho,gamma,n,i)
         sum_ls.append(np.matmul(W,munt))
-    Wmu_tilde_lag = np.matmul(W_lag,munt_lag)-(1/T)*sum(sum_ls)
-    
+    Wmu_tilde_lag = np.matmul(W_lag,munt_lag)-(1/T)*sum(sum_ls)  
     return Wmu_tilde_lag
 
-def get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t):
+
+def get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t,T):
+    # n*k
     W_lag = W_ls[t]
     chi_lag = get_chi(x,W_ls,lam,rho,gamma,n,t)
     sum_ls = []
@@ -467,8 +476,11 @@ def get_Wchi_tilde_lag(x,W_ls,lam,rho,gamma,n,t):
         sum_ls.append(np.matmul(W,chi))
     Wchi_tilde_lag = np.matmul(W_lag,chi_lag)-(1/T)*sum(sum_ls)
     return Wchi_tilde_lag
-    
+
+
+# test passed
 def get_x_tilde(x,t,T):
+    # n*k
     xt = x[t]
     sum_ls = []
     for i in range(T):
@@ -506,8 +518,10 @@ def get_chi(x,W_ls,lam,rho,gamma,n,t):
     
 
 # test passed
+
+# Ant has no lag, +1 included in calculation, treat it as no-lag variables like X.
 def get_Ant(W_ls,lam,rho,gamma,n,t):
-    # no lag
+    # no lag since Snt has no lag
     W = W_ls[t+1]
     # lag
     W_lag = W_ls[t]
@@ -518,7 +532,7 @@ def get_Ant(W_ls,lam,rho,gamma,n,t):
 
 # test passed
 def get_Ant_h(W_ls,lam,rho,gamma,n,t,h):
-    # Ant has not lag so t = t+1
+    # Ant has no lag
     A0 = np.identity(n)
     # check h so that (t+1)-h+1 does not go below one
     if (h>t+1):
@@ -543,7 +557,8 @@ def get_Ant_h(W_ls,lam,rho,gamma,n,t,h):
         
     return Ant_h
     
-    
+
+# test passed
 def get_mu_tilde(W_ls,lam,rho,gamma,n,t,T):
     munt = get_mu(W_ls,lam,rho,gamma,n,t)
     sum_ls = []
@@ -553,13 +568,14 @@ def get_mu_tilde(W_ls,lam,rho,gamma,n,t,T):
     return mu_tilde
     
     
-    
+# test passed    
 def get_mu(W_ls,lam,rho,gamma,n,t):
     # returns an n*n matrix
     upper_bound = t
     sum_ls = []
     for h in range(upper_bound+1):
         Ant_h = get_Ant_h(W_ls,lam,rho,gamma,n,t,h)
+        # Snt has no lag
         W = W_ls[t-h+1]
         Snt = np.identity(n)-lam*W
         Ant_hS = np.matmul(Ant_h,np.linalg.inv(Snt))
@@ -567,12 +583,15 @@ def get_mu(W_ls,lam,rho,gamma,n,t):
     return sum(sum_ls)
 
 
+# test passed
 def get_Unt(W_ls,V_ls,lam,rho,gamma,n,t):
     # returns a n*1 matrix
     upper_bound = t
+    V_nt = V_ls[t]
     sum_ls = []
     for h in range(upper_bound+1):
         Ant_h = get_Ant_h(W_ls,lam,rho,gamma,n,t,h)
+        # Snt has no lag
         W = W_ls[t-h+1]
         Snt = np.identity(n)-lam*W
         Ant_hS = np.matmul(Ant_h,np.linalg.inv(Snt))
